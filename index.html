@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html>
+<style>
+text.title {
+    font-size: 1.7em;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-weight: bold;
+    font-variant: small-caps;
+    font-style: italic;
+}   
+
+text.subtitle {
+    font-size: 1.2em;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-variant: small-caps;
+}
+
+text.year {
+    font-size: 1.4em;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-weight: bold;
+}
+
+.states :hover {
+    stroke: rgb(147, 146, 146);
+    stroke-width: 2.5;
+}
+
+.states {
+    stroke: rgb(147, 146, 146);
+    stroke-width: 0.75;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+div.tooltip {   
+ 	position: absolute;           
+	text-align: left;           
+	width: 122px;                  
+	height: 66px;       
+	padding: 10px;             
+    font: 11.5px Georgia;
+	background: gainsboro;
+    fill-opacity: .5;
+	pointer-events: none;         
+}
+
+.legend {
+	position:relative;
+	left:-100px;
+	bottom:190px;
+}
+
+.annotation-note, .annotation-note-title {
+    font-size: 0.75em;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+}
+
+.annotation text {
+    fill: black
+}
+
+#slider{
+    font-size: 1.25em;
+    font-family: Georgia, 'Times New Roman', Times, serif;
+    font-style: italic;
+    font-weight: bold;
+    font-variant: small-caps;
+}
+
+</style>
+<body>
+  <div id = "slider">
+    <input type="range" id="year" name = "year" min = "1895" max = "2021" step = "63" value=1895 oninput="selected_year.value = year.value">
+    <label for = "year">year</label>
+    <output name="selected_year" id="selected_year">1895</output>
+  </div>
+<svg width=960 height=60>
+    <text class="title" x=205 y=25>rising max temperatures in the united states</text>
+    <text class = "subtitle" x = 283 y = 47>-variance in each state from its 1901~2000 mean-</text>
+  </svg>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="https://unpkg.com/topojson-client@3"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3-annotation/2.5.1/d3-annotation.min.js"></script>
+<script>
+  /*
+  SOURCES and REFERENCES used for this visualization (through modified code and guidance in steps):
+  Climate data from: https://www.ncei.noaa.gov/access/monitoring/climate-at-a-glance/
+  Map shape/TOPOJSON reference from: https://bl.ocks.org/mbostock/4090848
+  Tooltip and legend reference from: http://bl.ocks.org/michellechandra/0b2ce4923dc9b5809922
+  Slider to select year reference from: https://bl.ocks.org/martinjc/f621fbc6a5b795bf01f4c0be0bee5093
+  Annotations reference from: https://bl.ocks.org/susielu/a464c24d8b42f0c4d9fafe7b48e9e60a
+  */
+var width = 960,
+    height = 650;
+
+var stateFill = d3.scaleLinear()
+    .domain([-5, 0, 5])
+    .range(["dodgerblue", "white", "orange"]);
+
+var path = d3.geoPath();
+
+var svg = d3.select("body").append("svg")
+    .attr("width", width)
+    .attr("height", height);
+
+var tooltip = d3.select("body")
+        .append("div")   
+        .attr("class", "tooltip")               
+        .style("opacity", 0);
+
+const annotationsAll = [
+  {
+    note: {
+      title: "**ALASKA + HAWAII",
+      label: "Data was only available from the NCEI for the 48 contiguous states."
+    },
+    connector: {
+        type: "curve",
+        points: [[100, 14],[80, 40]]
+    },
+    x: 150,
+    y: 506,
+    dy: 50,
+    dx: 100
+  },
+  {
+    note: {
+      title: "LEGEND",
+      label: "-5\u00B0F 0\u00B0F +5\u00B0F"
+    },
+    x: 895,
+    y: 410,
+    dy: 0,
+    dx: 0
+  },
+  {
+    note: {
+      title: "HOVER",
+      label: "Across each state to view more details.",
+    },
+    x: 95,
+    y: 395,
+    dy: 10,
+    dx: -10
+  }
+]
+
+const annotations1895 = [
+  {
+    note: {
+      title: "MAINE",
+      label: "In 1895, the only state that recorded an avg max temp above its 1901~2000 mean."
+    },
+    x: 880,
+    y: 90,
+    dy: -20,
+    dx: -50
+  },{
+    note: {
+      title: "STARTING POINT: 1895",
+      label: "The first year climate data is available from the NCEI."
+    },
+    x: 378,
+    y: 0,
+    dy: 0,
+    dx: 0
+  }
+]
+
+const annotations1958 = [
+  {
+    type: d3.annotationCalloutCircle,
+    note: {
+      title: "",
+      label: "There is now a clear regional pattern in average max temps rising above the mean.",
+      wrap: 180
+    },
+    subject:{
+      radius: 47
+    },
+    x: 172,
+    y: 194,
+    dy: -149,
+    dx: 60
+  },
+  {
+    note: {
+      title: "MID POINT: 1958",
+      label: "The middle between the most recent full year and the first year."
+    },
+    x: 480,
+    y: 0,
+    dy: 0,
+    dx: 0
+  }
+]
+
+const annotations2021 = [
+  {
+    note: {
+      title: "NOW",
+      label: "In 2021, *every* state recorded an average max temp above its 1901~2000 mean."
+    },
+    x: 755,
+    y: 72,
+    dy: 0,
+    dx: 0
+  },{
+    note: {
+      title: "WHERE WE ARE: 2021",
+      label: "The most recent full year climate data is available from the NCEI."
+    },
+    x: 580,
+    y: 0,
+    dy: 0,
+    dx: 0
+  }
+]
+
+d3.queue()
+.defer(d3.json, "10m.json")
+.defer(d3.csv, "tmax.csv")
+.await(ready)
+
+function ready (error, data, tmax){
+
+map("1895");
+
+  function map(year){
+
+    var states = topojson.feature(data, data.objects.states).features
+
+    for (var i = 0; i < tmax.length; i++){
+      if (tmax[i].Year == year){
+        var ID = tmax[i].ID;
+        var name = tmax[i].Location;
+        var mean = tmax[i].Mean;
+        var value = tmax[i].Anomaly;
+        found = false;
+
+        for (var j = 0; j < states.length; j++){
+          var stateID = states[j].id;
+          if (ID == stateID){
+              states[j].name = name;
+              states[j].mean = mean;
+              states[j].variance = value;
+              found = true;
+          }
+        }
+      }
+    }
+
+    states[26].variance = null;
+    states[26].name = "Alaska";
+    states[26].mean = null;
+    states[44].variance = null;
+    states[44].name = "Hawaii";
+    states[44].mean = null;
+    states[50].variance = null;
+
+    /*console.log(states);*/
+
+    svg.append("g")
+    .attr("class", "states")
+    .selectAll("path")
+    .data(states)
+    .enter().append("path")
+    .attr("d", path)
+    .attr("fill", function(d) {return stateFill(d.variance)})
+
+    .on("mouseover", function(d) { 
+      tooltip.transition()        
+          .duration(200)      
+          .style("opacity", .92);
+        tooltip.text("*State: " + d.name + " *1901~2000 Mean Temp: " + d.mean + " (\u00B0F)" + " *Variance from Mean Temp: " + d.variance + " (\u00B0F)")
+          .style("left", (d3.event.pageX +8) + "px")     
+          .style("top", (d3.event.pageY -60) + "px");    
+    })
+    .on("mouseout", function(d) {       
+        tooltip.transition()        
+          .duration(200)      
+          .style("opacity", 0);   
+    });
+
+    const makeAnnotations = d3.annotation()
+      .type(d3.annotationLabel)
+      .annotations(annotationsAll)
+
+      svg.append("g")
+      .attr("id", "annotationsAll")
+      .call(makeAnnotations)
+
+    if (year == "1895"){
+    var makeAnnotations1895 = d3.annotation()
+    .type(d3.annotationLabel)
+    .annotations(annotations1895)
+    
+    svg.append("g")
+    .attr("id", "annotations1895")
+    .call(makeAnnotations1895)
+    }
+    else{
+      d3.select("#annotations1895").remove();
+    }
+
+    if (year == "1958"){
+    var makeAnnotations1958 = d3.annotation()
+    .type(d3.annotationLabel)
+    .annotations(annotations1958)
+    
+    svg.append("g")
+    .attr("id", "annotations1958")
+    .call(makeAnnotations1958)
+    }
+    else{
+      d3.select("#annotations1958").remove();
+    }
+
+    if (year == "2021"){
+    var makeAnnotations2021 = d3.annotation()
+    .type(d3.annotationLabel)
+    .annotations(annotations2021)
+    
+    svg.append("g")
+    .attr("id", "annotations2021")
+    .call(makeAnnotations2021)
+    }
+    else{
+      d3.select("#annotations2021").remove();
+    }
+
+    var slide = d3.select('#year');
+        slide.on('change', function() {
+          map(this.value);
+          d3.select(".annotations").remove();
+        });
+    }
+}
+
+var legend = d3.select("body").append("svg")
+.attr("class", "legend")
+.attr("width", 100)
+.attr("height", 20)
+.append("g")
+
+legend.selectAll("rect")
+.data([-5,0,5])
+.enter()
+.append("rect")
+.attr("x", function(d,i) {return (i*25) })
+.attr("y", 0)
+.attr("width", 20)
+.attr("height", 20)
+.style("stroke", "grey")
+.style("fill", function(d) {return stateFill(d)});
+
+</script>
+</body>
+</html>
